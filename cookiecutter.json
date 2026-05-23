@@ -1,0 +1,20 @@
+{
+  "author_names": "Yuchen Xiao",
+  "author_emails": "xyuc12en@gmail.com",
+  "maintainer_names": "Yuchen Xiao",
+  "maintainer_emails": "xyuc12en@gmail.com",
+  "maintainer_github_usernames": "ycexiao",
+  "contributors": "Yuchen Xiao",
+  "license_holders": "BSD-3",
+  "project_name": "passkey",
+  "github_username_or_orgname": "ycexiao",
+  "github_repo_name": "passkey",
+  "conda_pypi_package_dist_name": "passkey",
+  "package_dir_name": "passkey",
+  "project_short_description": "Python package for managing passwords",
+  "project_keywords": "password",
+  "minimum_supported_python_version": "3.12",
+  "maximum_supported_python_version": "3.14",
+  "project_needs_c_code_compiled": "No",
+  "project_has_gui_tests": "No"
+}
