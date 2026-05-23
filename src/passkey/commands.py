@@ -133,43 +133,64 @@ def cmd_find(args):
         print(f"{key}: {value}")
 
 
+def prompt_extra_non_secret_fields():
+    """Interactively collect additional non-secret key/value pairs."""
+    fields = {}
+    while ui_confirm("Extra fields", "Add another non-secret field?"):
+        key = ui_text("Field name", "Name of the field:").strip()
+        if not key:
+            continue
+        fields[key] = ui_text(
+            f"Value for '{key}'", f"Enter value for '{key}': "
+        )
+    return fields
+
+
 def cmd_insert(args):
     """Add a new account with a user-typed password."""
+    accounts = load_accounts()
     name = args.name
     if not name:
-        name = ui_text("Account name", "Enter account name: ")
+        folders = sorted({n.split("/")[0] for n in accounts if "/" in n})
+        hint = f" [{', '.join(folders)}]" if folders else ""
+        name = ui_text("Account name", f"Enter account name{hint}: ")
 
     validate_name(name)
-    accounts = load_accounts()
     if name in accounts:
         sys.exit(
             f"Account '{name}' already exists. "
             "Delete it first or pick another name."
         )
 
-    username = ui_text("Username", "Enter username: ")
+    username = ui_text("Username", "Enter username", default="NAN")
+    meta = {"username": username}
+    meta.update(prompt_extra_non_secret_fields())
+
     password = ui_password("Password", confirm=True)
-    data = {"username": username, "password": password}
-    data.update(prompt_extra_secret_fields())
-    store_account(accounts, name, data)
+    secret = {"password": password}
+    secret.update(prompt_extra_secret_fields())
+
+    store_account(accounts, name, secret, meta=meta)
     print(f"Saved account '{name}'.")
 
 
 def cmd_generate(args):
     """Add a new account with a randomly generated password."""
+    accounts = load_accounts()
     name = args.name
     if not name:
-        name = ui_text("Account name", "Enter account name: ")
+        folders = sorted({n.split("/")[0] for n in accounts if "/" in n})
+        hint = f" [{', '.join(folders)}]" if folders else ""
+        name = ui_text("Account name", f"Enter account name{hint}: ")
 
     validate_name(name)
-    accounts = load_accounts()
     if name in accounts:
         sys.exit(
             f"Account '{name}' already exists. "
             "Delete it first or pick another name."
         )
 
-    username = ui_text("Username", "Enter username: ")
+    username = ui_text("Username", "Enter username", default="NAN")
     alphabet = string.ascii_letters + string.digits
     if not args.no_symbols:
         alphabet += "!@#$%^&*()-_=+[]{};:,.<>?"

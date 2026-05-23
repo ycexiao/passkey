@@ -152,10 +152,13 @@ def sync_ages_recipients():
             (AGES_RECIPIENTS_DIR / f.name).write_text(f.read_text())
 
 
-def store_account(accounts, name, secrets_data):
+def store_account(accounts, name, secrets_data, meta=None):
     """Encrypt secrets_data and save both encrypted blob and account
     index."""
-    accounts[name] = {"secrets": name}
+    entry = {"secrets": name}
+    if meta:
+        entry.update(meta)
+    accounts[name] = entry
     dest = secrets_path(name)
     rfiles = [f for f in sorted(RECIPIENTS_DIR.iterdir()) if f.is_file()]
     if not rfiles:
