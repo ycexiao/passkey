@@ -1,5 +1,7 @@
+import json
 import secrets
 import string
+import subprocess
 import sys
 
 from passkey.helpers import (
@@ -11,12 +13,15 @@ from passkey.helpers import (
     validate_name,
 )
 from passkey.main import (
+    AGES_RECIPIENTS_DIR,
+    RECIPIENTS_DIR,
     SPECIAL_KEYS,
     decrypt_secrets,
     load_accounts,
     save_accounts,
     secrets_path,
     store_account,
+    sync_ages_recipients,
 )
 from passkey.ui import ui_confirm, ui_password, ui_select, ui_text
 
@@ -85,7 +90,8 @@ def cmd_insert(args):
     accounts = load_accounts()
     if name in accounts:
         sys.exit(
-            f"Account '{name}' already exists. Delete it first or pick another name."
+            f"Account '{name}' already exists. "
+            "Delete it first or pick another name."
         )
 
     username = ui_text("Username", "Enter username: ")
@@ -106,7 +112,8 @@ def cmd_generate(args):
     accounts = load_accounts()
     if name in accounts:
         sys.exit(
-            f"Account '{name}' already exists. Delete it first or pick another name."
+            f"Account '{name}' already exists. "
+            "Delete it first or pick another name."
         )
 
     username = ui_text("Username", "Enter username: ")
@@ -121,7 +128,8 @@ def cmd_generate(args):
     clip_tool = copy_to_clipboard(password)
     if clip_tool:
         print(
-            f"Generated password for '{name}' copied to clipboard via {clip_tool}."
+            f"Generated password for '{name}' copied to "
+            f"clipboard via {clip_tool}."
         )
     else:
         print(f"Generated password for '{name}': {password}")
@@ -177,3 +185,78 @@ def cmd_remove(args):
     del accounts[chosen]
     save_accounts(accounts)
     print(f"Removed account '{chosen}'.")
+
+
+def cmd_rotate(args):
+    """Re-encrypt secrets whose recipients dir has diverged from the
+    global recipients dir."""
+    del args
+
+    def _itered_dir(d):
+        return (
+            {f.name: f.read_text().strip() for f in d.iterdir() if f.is_file()}
+            if d.exists()
+            else {}
+        )
+
+    desired = _itered_dir(RECIPIENTS_DIR)
+    current = _itered_dir(AGES_RECIPIENTS_DIR)
+
+    if desired == current:
+        print("Recipients unchanged. Nothing to do.")
+        return
+
+    added = {n for n, t in desired.items() if current.get(n) != t}
+    removed = {
+        n for n in current if n not in desired or current[n] != desired[n]
+    }
+    print("\nRecipient changes detected:")
+    for n in sorted(added - removed):
+        print(f"  + {n}")
+    for n in sorted(removed - added):
+        print(f"  - {n}")
+    for n in sorted(added & removed):
+        print(f"  ~ {n}")
+
+    accounts = load_accounts()
+    age_files = []
+    for name, account in accounts.items():
+        ref = account.get("secrets", name)
+        p = secrets_path(ref)
+        if p.exists():
+            age_files.append((name, p))
+
+    if age_files:
+        print(f"\nWill re-encrypt {len(age_files)} file(s):")
+        for _, p in age_files:
+            print(f"  {p.name}")
+    else:
+        print("\nNo encrypted files to rotate.")
+        sync_ages_recipients()
+        return
+
+    if not ui_confirm("Rotate recipients", "Proceed with rotation?"):
+        sys.exit("Cancelled.")
+
+    rfiles = sorted(f for f in RECIPIENTS_DIR.iterdir() if f.is_file())
+    if not rfiles:
+        sys.exit(f"No recipient files found in {RECIPIENTS_DIR}")
+    age_args = ["age", "-a"]
+    for rf in rfiles:
+        age_args += ["-R", str(rf)]
+
+    for _, src in age_files:
+        data = decrypt_secrets(src)
+        payload = json.dumps(data, indent=2, sort_keys=True)
+        result = subprocess.run(
+            age_args, input=payload, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            sys.exit(
+                f"age encrypt failed for {src.name}: {result.stderr.strip()}"
+            )
+        src.write_text(result.stdout)
+        print(f"  Rotated: {src.name}")
+
+    sync_ages_recipients()
+    print("\nRotation complete.")

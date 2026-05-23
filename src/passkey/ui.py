@@ -4,7 +4,8 @@ import getpass
 def ui_select(title, choices, text=""):
     """Show numbered choices and return the selected one.
 
-    Short-circuits and returns immediately when there is only one choice.
+    Short-circuits and returns immediately when there is only one
+    choice.
     """
     if len(choices) == 1:
         return choices[0]
@@ -26,7 +27,8 @@ def ui_select(title, choices, text=""):
 
 
 def ui_password(title, confirm=False):
-    """Prompt for a hidden password, optionally requiring confirmation."""
+    """Prompt for a hidden password, optionally requiring
+    confirmation."""
     while True:
         print(f"\n{title}")
         pw = getpass.getpass("Enter password: ")

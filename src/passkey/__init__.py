@@ -12,7 +12,7 @@
 # See LICENSE.rst for license information.
 #
 ##############################################################################
-"""Python package for managing passwords"""
+"""Python package for managing passwords."""
 
 # package version
 from passkey.version import __version__  # noqa

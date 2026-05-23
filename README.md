@@ -29,7 +29,7 @@ pip install -e .
 
 > The above command will automatically install the dependencies listed in `requirements/pip.txt`.
 
-### Method 2: Install your package with dependencies sourced from pip/conda 
+### Method 2: Install your package with dependencies sourced from pip/conda
 
 Not available for now.
 

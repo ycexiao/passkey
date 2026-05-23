@@ -10,7 +10,8 @@ SAFE_NAME = re.compile(r"^[A-Za-z0-9._@+\-/]+$")
 
 
 def copy_to_clipboard(text):
-    """Copy text to the system clipboard using the first available tool."""
+    """Copy text to the system clipboard using the first available
+    tool."""
     if shutil.which("pbcopy"):
         subprocess.run(["pbcopy"], input=text, text=True, check=True)
         return "pbcopy"
@@ -31,12 +32,14 @@ def copy_to_clipboard(text):
 def validate_name(name):
     if not SAFE_NAME.match(name) or name.startswith("/") or name.endswith("/"):
         sys.exit(
-            f"Invalid account name: {name!r}. Allowed: letters, digits, . _ @ + - /. Format: Category/Subcategory/name"
+            f"Invalid account name: {name!r}. Allowed: letters, "
+            "digits, . _ @ + - /. Format: Category/Subcategory/name"
         )
 
 
 def prompt_extra_secret_fields():
-    """Interactively collect additional secret key/value pairs beyond password."""
+    """Interactively collect additional secret key/value pairs beyond
+    password."""
     fields = {}
     while ui_confirm("Extra fields", "Add another secret field?"):
         key = ui_text("Field name", "Name of the field:").strip()
@@ -47,7 +50,8 @@ def prompt_extra_secret_fields():
 
 
 def find_matching_accounts(query, accounts):
-    """Find matching accounts by exact, substring, group, or fuzzy matching."""
+    """Find matching accounts by exact, substring, group, or fuzzy
+    matching."""
     if query in accounts:
         return [query], "exact"
 

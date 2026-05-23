@@ -2,9 +2,11 @@
 """passkey - a tiny password manager backed by age.
 
 Storage layout under ~/.passkey:
-    accounts.json    unencrypted: hierarchical_name -> { secrets: <path|name>, ...arbitrary }
+    accounts.json    unencrypted: hierarchical_name ->
+                        { secrets: <path|name>, ...arbitrary }
     identity.txt     age private identity (chmod 600)
-    recipients/      one or more files of age public keys (passed to age via -R)
+    recipients/      one or more files of age public keys
+                        (passed to age via -R)
     ages/            encrypted JSON blobs; default key is "password"
 
 Requires: age and age-keygen.
@@ -23,6 +25,7 @@ ACCOUNTS_FILE = PASSKEY_DIR / "accounts.json"
 IDENTITY_FILE = PASSKEY_DIR / "identity.txt"
 RECIPIENTS_DIR = PASSKEY_DIR / "recipients"
 AGES_DIR = PASSKEY_DIR / "ages"
+AGES_RECIPIENTS_DIR = AGES_DIR / "recipients"
 
 SPECIAL_KEYS = {"secrets"}
 
@@ -31,6 +34,7 @@ def ensure_setup():
     PASSKEY_DIR.mkdir(parents=True, exist_ok=True)
     RECIPIENTS_DIR.mkdir(parents=True, exist_ok=True)
     AGES_DIR.mkdir(parents=True, exist_ok=True)
+    AGES_RECIPIENTS_DIR.mkdir(parents=True, exist_ok=True)
     if not ACCOUNTS_FILE.exists():
         save_accounts({})
     if not IDENTITY_FILE.exists():
@@ -89,7 +93,8 @@ def secrets_path(ref):
 
 
 def decrypt_secrets(src):
-    """Decrypt an age-encrypted JSON blob and return its contents as a dict."""
+    """Decrypt an age-encrypted JSON blob and return its contents as a
+    dict."""
     if not src.exists():
         sys.exit(f"No encrypted file at: {src}")
     result = subprocess.run(
@@ -105,8 +110,20 @@ def decrypt_secrets(src):
         sys.exit(f"Decrypted contents of {src} is not valid JSON")
 
 
+def sync_ages_recipients():
+    """Copy RECIPIENTS_DIR contents into AGES_RECIPIENTS_DIR, replacing
+    existing files."""
+    for f in AGES_RECIPIENTS_DIR.iterdir():
+        if f.is_file():
+            f.unlink()
+    for f in sorted(RECIPIENTS_DIR.iterdir()):
+        if f.is_file():
+            (AGES_RECIPIENTS_DIR / f.name).write_text(f.read_text())
+
+
 def store_account(accounts, name, secrets_data):
-    """Encrypt secrets_data and save both encrypted blob and account index."""
+    """Encrypt secrets_data and save both encrypted blob and account
+    index."""
     accounts[name] = {
         "secrets": name,
     }
@@ -126,6 +143,7 @@ def store_account(accounts, name, secrets_data):
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(result.stdout)
     save_accounts(accounts)
+    sync_ages_recipients()
 
 
 def build_parser():
@@ -134,6 +152,7 @@ def build_parser():
         cmd_generate,
         cmd_insert,
         cmd_remove,
+        cmd_rotate,
         cmd_show,
     )
 
@@ -189,6 +208,12 @@ def build_parser():
         "name", help="account name or partial path to search for"
     )
     remove_parser.set_defaults(func=cmd_remove)
+
+    rotate_parser = sub.add_parser(
+        "rotate",
+        help="re-encrypt secrets when recipients dir has changed",
+    )
+    rotate_parser.set_defaults(func=cmd_rotate)
 
     return parser
 
