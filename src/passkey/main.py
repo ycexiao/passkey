@@ -30,18 +30,10 @@ AGES_RECIPIENTS_DIR = AGES_DIR / "recipients"
 SPECIAL_KEYS = {"secrets"}
 
 
-def ensure_setup():
-    PASSKEY_DIR.mkdir(parents=True, exist_ok=True)
-    RECIPIENTS_DIR.mkdir(parents=True, exist_ok=True)
-    AGES_DIR.mkdir(parents=True, exist_ok=True)
-    AGES_RECIPIENTS_DIR.mkdir(parents=True, exist_ok=True)
-    if not ACCOUNTS_FILE.exists():
-        save_accounts({})
+def _setup_identity():
+    """Generate identity.txt if absent and register its public key in
+    recipients/."""
     if not IDENTITY_FILE.exists():
-        print(
-            f"No identity at {IDENTITY_FILE}. Generating one...",
-            file=sys.stderr,
-        )
         subprocess.run(
             ["age-keygen", "-o", str(IDENTITY_FILE)],
             capture_output=True,
@@ -49,6 +41,7 @@ def ensure_setup():
             check=True,
         )
         IDENTITY_FILE.chmod(0o600)
+        print(f"Generated identity at {IDENTITY_FILE}.", file=sys.stderr)
 
     pubkey = subprocess.run(
         ["age-keygen", "-y", str(IDENTITY_FILE)],
@@ -57,7 +50,11 @@ def ensure_setup():
         check=True,
     ).stdout.strip()
     if pubkey:
-        existing = [f for f in RECIPIENTS_DIR.iterdir() if f.is_file()]
+        existing = [
+            f
+            for f in RECIPIENTS_DIR.iterdir()
+            if f.is_file() and f.name != ".gitkeep"
+        ]
         if not any(pubkey in f.read_text() for f in existing):
             dest = RECIPIENTS_DIR / "default.txt"
             i = 1
@@ -65,7 +62,29 @@ def ensure_setup():
                 dest = RECIPIENTS_DIR / f"default-{i}.txt"
                 i += 1
             dest.write_text(pubkey + "\n")
-            print(f"Public key written to {dest}", file=sys.stderr)
+            print(f"Public key written to {dest}.", file=sys.stderr)
+
+
+def ensure_setup():
+    """Exit with a helpful error if the passkey store is not
+    initialized."""
+    missing = [
+        str(p)
+        for p in [
+            PASSKEY_DIR,
+            RECIPIENTS_DIR,
+            AGES_DIR,
+            AGES_RECIPIENTS_DIR,
+            ACCOUNTS_FILE,
+            IDENTITY_FILE,
+        ]
+        if not p.exists()
+    ]
+    if missing:
+        sys.exit(
+            "Passkey store is not initialized. Run: passkey init\n"
+            "Missing: " + ", ".join(missing)
+        )
 
 
 def load_accounts():
@@ -148,12 +167,15 @@ def store_account(accounts, name, secrets_data):
 
 def build_parser():
     from passkey.commands import (
+        cmd_commit,
         cmd_find,
         cmd_generate,
+        cmd_init,
         cmd_insert,
         cmd_remove,
         cmd_rotate,
         cmd_show,
+        cmd_sync,
     )
 
     parser = argparse.ArgumentParser(
@@ -215,6 +237,31 @@ def build_parser():
     )
     rotate_parser.set_defaults(func=cmd_rotate)
 
+    init_parser = sub.add_parser(
+        "init",
+        help="initialize the ~/.passkey store (aborts if it already exists)",
+    )
+    init_parser.add_argument(
+        "--from",
+        dest="from_url",
+        metavar="URL",
+        help="clone an existing remote git repository as ~/.passkey",
+    )
+    init_parser.set_defaults(func=cmd_init)
+
+    sync_parser = sub.add_parser(
+        "sync",
+        help="git pull then git push the ~/.passkey repository",
+    )
+    sync_parser.set_defaults(func=cmd_sync)
+
+    commit_parser = sub.add_parser(
+        "commit",
+        help="stage all changes in ~/.passkey and commit",
+    )
+    commit_parser.add_argument("message", help="commit message")
+    commit_parser.set_defaults(func=cmd_commit)
+
     return parser
 
 
@@ -225,7 +272,8 @@ def main():
                 f"{binary} not found on PATH. Install with: brew install age"
             )
     args = build_parser().parse_args()
-    ensure_setup()
+    if args.cmd != "init":
+        ensure_setup()
     args.func(args)
 
 

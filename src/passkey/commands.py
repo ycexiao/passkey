@@ -13,9 +13,13 @@ from passkey.helpers import (
     validate_name,
 )
 from passkey.main import (
+    ACCOUNTS_FILE,
+    AGES_DIR,
     AGES_RECIPIENTS_DIR,
+    PASSKEY_DIR,
     RECIPIENTS_DIR,
     SPECIAL_KEYS,
+    _setup_identity,
     decrypt_secrets,
     load_accounts,
     save_accounts,
@@ -24,6 +28,57 @@ from passkey.main import (
     sync_ages_recipients,
 )
 from passkey.ui import ui_confirm, ui_password, ui_select, ui_text
+
+
+def cmd_init(args):
+    """Initialize the ~/.passkey store, optionally cloning from a
+    remote."""
+    if PASSKEY_DIR.exists() and any(PASSKEY_DIR.iterdir()):
+        sys.exit(
+            f"{PASSKEY_DIR} already exists and is not empty. Remove it first."
+        )
+
+    if args.from_url:
+        result = subprocess.run(
+            ["git", "clone", args.from_url, str(PASSKEY_DIR)]
+        )
+        if result.returncode != 0:
+            sys.exit("git clone failed.")
+        for d in [RECIPIENTS_DIR, AGES_DIR, AGES_RECIPIENTS_DIR]:
+            d.mkdir(parents=True, exist_ok=True)
+        if not ACCOUNTS_FILE.exists():
+            save_accounts({})
+    else:
+        PASSKEY_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "-C", str(PASSKEY_DIR), "init"], check=True)
+        (PASSKEY_DIR / ".gitignore").write_text("identity.txt\n")
+        for d in [RECIPIENTS_DIR, AGES_DIR, AGES_RECIPIENTS_DIR]:
+            d.mkdir(parents=True, exist_ok=True)
+            (d / ".gitkeep").touch()
+        save_accounts({})
+
+    _setup_identity()
+    print(f"Passkey store initialized at {PASSKEY_DIR}.")
+
+
+def cmd_sync(args):
+    """Pull then push the ~/.passkey git repository."""
+    del args
+    for git_cmd in [["pull"], ["push"]]:
+        result = subprocess.run(["git", "-C", str(PASSKEY_DIR)] + git_cmd)
+        if result.returncode != 0:
+            sys.exit(f"git {git_cmd[0]} failed.")
+
+
+def cmd_commit(args):
+    """Stage all changes in ~/.passkey and commit with the given
+    message."""
+    subprocess.run(["git", "-C", str(PASSKEY_DIR), "add", "-A"], check=True)
+    result = subprocess.run(
+        ["git", "-C", str(PASSKEY_DIR), "commit", "-m", args.message]
+    )
+    if result.returncode != 0:
+        sys.exit("git commit failed.")
 
 
 def cmd_find(args):
