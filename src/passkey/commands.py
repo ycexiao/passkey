@@ -5,14 +5,6 @@ import subprocess
 import sys
 
 from passkey.helpers import (
-    build_tree,
-    copy_to_clipboard,
-    find_matching_accounts,
-    format_tree,
-    prompt_extra_secret_fields,
-    validate_name,
-)
-from passkey.main import (
     ACCOUNTS_FILE,
     AGES_DIR,
     AGES_RECIPIENTS_DIR,
@@ -20,12 +12,18 @@ from passkey.main import (
     RECIPIENTS_DIR,
     SPECIAL_KEYS,
     _setup_identity,
+    build_tree,
+    copy_to_clipboard,
     decrypt_secrets,
+    find_matching_accounts,
+    format_tree,
     load_accounts,
+    prompt_extra_secret_fields,
     save_accounts,
     secrets_path,
     store_account,
     sync_ages_recipients,
+    validate_name,
 )
 from passkey.ui import ui_confirm, ui_password, ui_select, ui_text
 
